@@ -59,8 +59,11 @@ def apply_NMS(boxes, scores, labels, total_scores, iou=0.5):
     
     return filtered_boxes, filtered_scores, filtered_labels, filtered_total_scores
 
-def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, nms=False):
+def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, nms=False, prompt="A photo of a "):
     global skipped_categories
+    # inserting the prompt
+    vocabulary = [prompt + x for x in vocabulary]
+    
     # preparing the inputs
     inputs = processor(text=vocabulary, images=im, return_tensors="pt", padding=True).to(device)
     
@@ -110,9 +113,8 @@ def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, nms=Fa
         total_scores_filtered.append(total_scores)
     
     return {
-        'scores': scores_filtered,
-        'labels': labels_filtered,
-        'boxes': boxes_filtered,
-        'total_scores': total_scores_filtered
+        'scores': [float(score) for score in scores_filtered],
+        'labels': [int(lab) for lab in labels_filtered],
+        'boxes': [box.tolist() for box in boxes_filtered],
     }
 
