@@ -16,7 +16,7 @@ else:
 from transformers import OwlViTProcessor, OwlViTForObjectDetection, OwlViTTextConfig
 
 
-MAX_PREDICTIONS=1
+MAX_PREDICTIONS=20
 
 app = Flask(__name__)
 
@@ -32,14 +32,15 @@ print("Model loaded!")
 def detect_objects():
     if request.method == 'POST':
         # Receive the JSON data from the local machine
-        frame_json = request.data.decode('utf-8')
+        received_json = json.loads(request.data.decode('utf-8'))
         
         # Deserialize the JSON data to a numpy array
-        frame = np.array(json.loads(frame_json))
+        frame = np.array(received_json['frame'])
         
         # Perform object detection
-        vocabulary = ["person"]
-        results = evaluate_image(model, processor, frame, vocabulary, MAX_PREDICTIONS, nms=True)
+        vocabulary = received_json['vocabulary']
+        
+        results = evaluate_image(model, processor, frame, vocabulary, MAX_PREDICTIONS, nms=True, print_time=False)
 
         return jsonify(results), 200
 
