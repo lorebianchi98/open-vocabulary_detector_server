@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import cv2
 import requests
@@ -12,8 +13,33 @@ COLOR = ((255, 0, 0)) # BGR
 # URL of the remote server
 REMOTE_SERVER_URL = 'http://127.0.0.1:5000/detect'
 
+# shared variables
 LAST_FRAME = None
 LAST_RESULTS = None
+EXIT_FLAG = False
+VOCABOLARY = ['person']
+
+def get_text_entry(default_text, text="Propose a new caption"):
+    # Zenity command
+    char_width = 7
+    width = len(default_text) * char_width + 20
+    zenity_cmd = ['zenity', '--entry', '--entry-text', default_text, '--text', text, '--width', str(width)]
+
+    try:
+        # Execute Zenity command
+        result = subprocess.run(zenity_cmd, capture_output=True, text=True, check=True)
+
+        # Retrieve the entered text
+        entered_text = result.stdout.strip()
+
+        # Return the entered text
+        return entered_text
+
+    except subprocess.CalledProcessError as e:
+        # Handle any errors that occurred during execution
+        print(f"An error occurred: {e.stderr}")
+        return None
+
 
 def draw_bounding_boxes(frame, results, vocabulary):
     # Loop through the results and draw bounding boxes
@@ -40,43 +66,64 @@ def draw_bounding_boxes(frame, results, vocabulary):
         
     return frame
 
-
-def send_frame_and_receive_results(frame):
+def send_frame_and_receive_results(frame, vocabolary):
     to_send_frame = cv2.resize(frame, TARGET_SIZE)
-    frame_json = json.dumps(to_send_frame.tolist())  # Serialize the numpy array to a JSON string
-    response = requests.post(REMOTE_SERVER_URL, data=frame_json)
-    results = json.loads(response.text)
+    try:
+        response = requests.post(REMOTE_SERVER_URL, 
+                                 data=json.dumps({
+                                     "frame": to_send_frame.tolist(),
+                                     "vocabulary": vocabolary
+                                 }), 
+                                 timeout=5)
+        response.raise_for_status()
+        results = json.loads(response.text)
+    except requests.exceptions.RequestException as e:
+        return None
     return results
 
 def webcam_capture_and_display():
-    global LAST_FRAME, LAST_RESULTS
+    global LAST_FRAME, LAST_RESULTS, EXIT_FLAG, VOCABOLARY
     
     cap = cv2.VideoCapture(0)
-    vocabulary = ['person']
 
     while True:
         ret, frame = cap.read()
+        # listen to the keyboard
+        key = cv2.waitKey(1) & 0xFF
+        
         LAST_FRAME = frame
         global LAST_RESULTS
         if not ret:  # Check if frame capture was successful
             continue  # Skip the current iteration and try again    
         
         if LAST_RESULTS is not None:
-            frame = draw_bounding_boxes(frame, LAST_RESULTS, vocabulary)
+            frame = draw_bounding_boxes(frame, LAST_RESULTS, VOCABOLARY)
 
-        cv2.imshow('Object Detection', frame)
+        cv2.imshow('Open-Vocabulary Object Detection', frame)
 
-        if cv2.waitKey(1) & 0xFF == 27:  # Exit on ESC key
+        if key == ord('s'):
+            # Get user input for the input vocabulary
+            input = get_text_entry(";".join(VOCABOLARY), text="Write the input vocabulary. Different categories needs to be separeted by a ';'.")
+            if input is None:
+                continue
+            VOCABOLARY = input.split(";")
+        
+        # Exit on ESC key
+        if key == 27:  
+            EXIT_FLAG = True
+            print("Exiting...")
             break
 
 def main():
+    global LAST_RESULTS, EXIT_FLAG, VOCABOLARY
+    
     capture_thread = threading.Thread(target=webcam_capture_and_display)
     capture_thread.start()
-    global LAST_RESULTS
-    while True:
+    
+    while not EXIT_FLAG:
         if LAST_FRAME is not None:
             print("Sending request...")
-            LAST_RESULTS = send_frame_and_receive_results(LAST_FRAME)
+            LAST_RESULTS = send_frame_and_receive_results(LAST_FRAME, VOCABOLARY)
             print("Results received!")
 
 if __name__ == '__main__':
