@@ -17,6 +17,7 @@ REMOTE_SERVER_URL = 'http://127.0.0.1:5000/detect'
 LAST_FRAME = None
 LAST_RESULTS = None
 EXIT_FLAG = False
+SCORE_THRESH = 0.1
 VOCABOLARY = ['person']
 
 def get_text_entry(default_text, text="Propose a new caption"):
@@ -66,13 +67,14 @@ def draw_bounding_boxes(frame, results, vocabulary):
         
     return frame
 
-def send_frame_and_receive_results(frame, vocabolary):
+def send_frame_and_receive_results(frame, vocabolary, score_thresh):
     to_send_frame = cv2.resize(frame, TARGET_SIZE)
     try:
         response = requests.post(REMOTE_SERVER_URL, 
                                  data=json.dumps({
                                      "frame": to_send_frame.tolist(),
-                                     "vocabulary": vocabolary
+                                     "vocabulary": vocabolary,
+                                     "score_thresh": score_thresh
                                  }), 
                                  timeout=5)
         response.raise_for_status()
@@ -82,7 +84,7 @@ def send_frame_and_receive_results(frame, vocabolary):
     return results
 
 def webcam_capture_and_display():
-    global LAST_FRAME, LAST_RESULTS, EXIT_FLAG, VOCABOLARY
+    global LAST_FRAME, LAST_RESULTS, EXIT_FLAG, VOCABOLARY, SCORE_THRESH
     
     cap = cv2.VideoCapture(0)
 
@@ -98,7 +100,8 @@ def webcam_capture_and_display():
         
         if LAST_RESULTS is not None:
             frame = draw_bounding_boxes(frame, LAST_RESULTS, VOCABOLARY)
-
+            
+        cv2.namedWindow('Open-Vocabulary Object Detection', cv2.WINDOW_NORMAL)
         cv2.imshow('Open-Vocabulary Object Detection', frame)
 
         if key == ord('s'):
@@ -113,18 +116,28 @@ def webcam_capture_and_display():
             EXIT_FLAG = True
             print("Exiting...")
             break
+        
+        # Check for up arrow key
+        if key == 82:
+            SCORE_THRESH += 0.01
+            print("Score threshold: %s" % SCORE_THRESH)
+        
+        # down arrow
+        if key == 84:
+            SCORE_THRESH -= 0.01
+            print("Score threshold: %s" % SCORE_THRESH)
 
 def main():
-    global LAST_RESULTS, EXIT_FLAG, VOCABOLARY
+    global LAST_RESULTS, EXIT_FLAG, VOCABOLARY, SCORE_THRESH
     
     capture_thread = threading.Thread(target=webcam_capture_and_display)
     capture_thread.start()
     
     while not EXIT_FLAG:
         if LAST_FRAME is not None:
-            print("Sending request...")
-            LAST_RESULTS = send_frame_and_receive_results(LAST_FRAME, VOCABOLARY)
-            print("Results received!")
+            # print("Sending request...")
+            LAST_RESULTS = send_frame_and_receive_results(LAST_FRAME, VOCABOLARY, SCORE_THRESH)
+            # print("Results received!")
 
 if __name__ == '__main__':
     main()
