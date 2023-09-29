@@ -8,8 +8,20 @@ import numpy as np
 import threading
 
 TARGET_SIZE = (224, 224)
+COLOR = (255, 0, 0) # BGR
+COLORS = [
+    (255, 0, 0),   # Blue
+    (0, 255, 0),   # Green
+    (0, 0, 255),   # Red
+    (0, 165, 255), # Orange
+    (0, 255, 255), # Yellow
+    (130, 0, 75),  # Indigo
+    (128, 0, 128), # Violet
+    (147, 20, 255),# Deep Pink
+    (0, 128, 0),   # Dark Green
+    (128, 128, 128)# Gray
+]
 
-COLOR = ((255, 0, 0)) # BGR
 # URL of the remote server
 REMOTE_SERVER_URL = 'http://127.0.0.1:5000/detect'
 
@@ -57,13 +69,15 @@ def draw_bounding_boxes(frame, results, vocabulary):
         # Convert the label to a string
         class_label = vocabulary[label]
         score_str = f"{score:.3f}"
+        
+        color = COLORS[label % len(COLORS)]
 
         # Draw the bounding box
-        cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR, 2)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
         # Put the label and score on the image
         text = f"{class_label} {score_str}"
-        cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR, 2)
+        cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         
     return frame
 
@@ -115,7 +129,7 @@ def webcam_capture_and_display():
         if key == 27:  
             EXIT_FLAG = True
             print("Exiting...")
-            break
+            break       
         
         # Check for up arrow key
         if key == 82:
