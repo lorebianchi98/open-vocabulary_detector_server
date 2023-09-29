@@ -3,7 +3,6 @@ import time
 
 from torchvision.ops import batched_nms
 
-SCORE_THRESH = 0.15
 import numpy as np
 
 # Use GPU if available
@@ -60,7 +59,7 @@ def apply_NMS(boxes, scores, labels, total_scores, iou=0.5):
     
     return filtered_boxes, filtered_scores, filtered_labels, filtered_total_scores
 
-def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, nms=False, prompt="A photo of a ", print_time=True):
+def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, score_thresh=0.05, nms=False, prompt="A photo of a ", print_time=True):
     global skipped_categories
     # inserting the prompt
     vocabulary = [prompt + x for x in vocabulary]
@@ -115,7 +114,7 @@ def evaluate_image(model, processor, im, vocabulary, MAX_PREDICTIONS=100, nms=Fa
     
     # filtering the predictions with low confidence
     for score, box, label, total_scores in sorted_data[:MAX_PREDICTIONS]:
-        if score < SCORE_THRESH:
+        if score < score_thresh:
             continue
         scores_filtered.append(score)
         labels_filtered.append(label)

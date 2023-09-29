@@ -36,11 +36,10 @@ def detect_objects():
         
         # Deserialize the JSON data to a numpy array
         frame = np.array(received_json['frame'])
-        
-        # Perform object detection
+        score_thresh = received_json['score_thresh']
         vocabulary = received_json['vocabulary']
         
-        results = evaluate_image(model, processor, frame, vocabulary, MAX_PREDICTIONS, nms=True, print_time=False)
+        results = evaluate_image(model, processor, frame, vocabulary, MAX_PREDICTIONS, score_thresh=score_thresh, nms=True, print_time=False)
 
         return jsonify(results), 200
 
