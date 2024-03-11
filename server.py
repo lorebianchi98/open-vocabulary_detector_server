@@ -1,48 +1,51 @@
 from flask import Flask, request, jsonify
+from PIL import Image
 
-from utils import evaluate_image
-import torch
-import json
-
-import numpy as np
-import cv2
-
-# Use GPU if available
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
-
-from transformers import OwlViTProcessor, OwlViTForObjectDetection, OwlViTTextConfig
+from detector import OpenVocabularyDetector
 
 
-MAX_PREDICTIONS=20
-
+detector = OpenVocabularyDetector()
 app = Flask(__name__)
 
-# loading the model
-print("Loading the model..")
-model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
-processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
-model = model.to(device)
-model.eval()
-print("Model loaded!")
 
 @app.route('/detect', methods=['POST'])
-def detect_objects():
-    if request.method == 'POST':
-        # Receive the JSON data from the local machine
-        received_json = json.loads(request.data.decode('utf-8'))
-        
-        # Deserialize the JSON data to a numpy array
-        frame = np.array(received_json['frame'])
-        score_thresh = received_json['score_thresh']
-        vocabulary = received_json['vocabulary']
-        
-        results = evaluate_image(model, processor, frame, vocabulary, MAX_PREDICTIONS, score_thresh=score_thresh, nms=True, print_time=False)
+def detect():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image found in the request'}), 400
 
-        return jsonify(results), 200
+    # get the image
+    image = Image.open(request.files['image'].stream)
+
+    print(request.form)
+
+    # optional parameters
+    vocabulary = request.form.getlist('vocabulary', None)
+    prompt = request.form.get('prompt', None)
+    max_predictions = request.form.get('max_predictions', None)
+    max_predictions = int(max_predictions) if max_predictions is not None else None
+    score_thresh = request.form.get('score_thresh', None)
+    score_thresh = float(score_thresh) if score_thresh is not None else None
+    nms_tresh = request.form.get('nms_tresh', None)
+    nms_tresh = float(nms_tresh) if nms_tresh is not None else None
+
+    print(f"Received request with:")
+    print(f"  {vocabulary=}")
+    print(f"  {prompt=}")
+    print(f"  {max_predictions=}")
+    print(f"  {score_thresh=}")
+    print(f"  {nms_tresh=}")
+
+    # run detection
+    results = detector.detect(
+        image,
+        vocabulary=vocabulary,
+        max_predictions=max_predictions,
+        score_thresh=score_thresh,
+        nms_thresh=nms_tresh,
+        prompt=prompt,
+    )
+
+    return jsonify(results), 200
 
 if __name__ == '__main__':
-    
-    app.run(host='0.0.0.0', port=5000)
+    app.run(port=5000, debug=True)
