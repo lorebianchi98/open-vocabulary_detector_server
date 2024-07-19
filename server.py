@@ -25,15 +25,15 @@ def detect():
     max_predictions = int(max_predictions) if max_predictions is not None else None
     score_thresh = request.form.get('score_thresh', None)
     score_thresh = float(score_thresh) if score_thresh is not None else None
-    nms_tresh = request.form.get('nms_tresh', None)
-    nms_tresh = float(nms_tresh) if nms_tresh is not None else None
+    nms_thresh = request.form.get('nms_thresh', None)
+    nms_thresh = float(nms_thresh) if nms_thresh is not None else None
 
     print(f"Received request with:")
     print(f"  {vocabulary=}")
     print(f"  {prompt=}")
     print(f"  {max_predictions=}")
     print(f"  {score_thresh=}")
-    print(f"  {nms_tresh=}")
+    print(f"  {nms_thresh=}")
 
     # run detection
     results = detector.detect(
@@ -41,7 +41,7 @@ def detect():
         vocabulary=vocabulary,
         max_predictions=max_predictions,
         score_thresh=score_thresh,
-        nms_thresh=nms_tresh,
+        nms_thresh=nms_thresh,
         prompt=prompt,
     )
 
