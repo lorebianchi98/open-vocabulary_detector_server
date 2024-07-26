@@ -1,6 +1,5 @@
 import time
 
-import numpy as np
 import torch
 from torchvision.ops import batched_nms
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
@@ -26,9 +25,10 @@ class OpenVocabularyDetector:
     DEFAULT_MAX_PREDICTIONS = 50
 
 
-    def __init__(self):
+    def __init__(self, device=None):
         # Use GPU if available
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
 
         # loading the model
@@ -102,6 +102,8 @@ class OpenVocabularyDetector:
 
 
 if __name__ == "__main__":
+    import timeit
+    from PIL import Image
     from visualize import draw
 
     detector = OpenVocabularyDetector()
@@ -123,8 +125,8 @@ if __name__ == "__main__":
     draw(image, output)
     image.save("output.jpg")
 
-    # test the inference time with timeit
-    import timeit
-    elapsed = timeit.timeit("detector.detect(image, vocabulary=vocabulary)", globals=globals(), number=10)
-    print(f"Average inference time: {elapsed / 10:.3f}s (FPS: {10 / elapsed:.2f})")
-
+    # benchmarking the inference time and memory usage
+    torch.cuda.reset_peak_memory_stats()
+    elapsed = timeit.timeit("detector.detect(image, vocabulary=vocabulary)", globals=globals(), number=100)
+    print(f"Average inference time: {elapsed / 100:.3f}s (FPS: {100 / elapsed:.2f})")
+    print(f"Max GPU memory used: {torch.cuda.max_memory_allocated() / 1024**3:.2f}GB")
