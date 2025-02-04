@@ -2,3 +2,6 @@ Flask
 Pillow
 opencv-python-headless
 transformers
+torch --index-url https://download.pytorch.org/whl/cu118
+torchvision --index-url https://download.pytorch.org/whl/cu118
+sort-track
