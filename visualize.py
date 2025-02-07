@@ -1,43 +1,54 @@
 import argparse
 import json
+import itertools
+
+import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
 
-def draw(image, output, threshold=0, icons=None):
-    # draw on the image
+
+def get_colors(count: int):
+    cmap = plt.cm.get_cmap("rainbow", count)
+    colors = []
+    for i in range(count):
+        color = cmap(i)
+        color = [int(255 * value) for value in color]
+        colors.append(tuple(color))
+    return colors
+
+
+def draw(image, output, draw_text=True):
+    # breakpoint()
+    detections = output['detections']
+    vocab = set(itertools.chain.from_iterable(d['label_names'] for d in detections))
+    num_colors = len(vocab)
+
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default((image.width + image.height) // 70)
     colors = ["red", "green", "blue", "yellow", "purple", "orange", "cyan", "magenta", "lime", "pink"]
+    color_map = dict(zip(vocab, colors[:num_colors]))
 
-    icon_map = {}
-    if icons:
-        with open(f'{icons}/map.json', 'r') as f:
-            icon_map = json.load(f)
-
-    for box, label, score in zip(output['boxes'], output['labels'], output['scores']):
-        if score < threshold:
+    for detection in detections:
+        if detection['parent_id'] == -1:  # skip 'image'
             continue
-        # unnormalize the box
-        x0, y0, x1, y1 = box[0] * image.width, box[1] * image.height, box[2] * image.width, box[3] * image.height
 
-        class_name = output['vocabulary'][label]
-        draw = ImageDraw.Draw(image, "RGBA")
-        # draw the icon
-        if class_name in icon_map:
-            draw.rounded_rectangle([x0, y0, x1, y1], radius=10, fill=(255, 255, 255, 75))
+        box = detection['box']
+        label_names = detection['label_names']
+        scores = detection['scores']
 
-            icon = Image.open(f'{icons}/{icon_map[class_name]}')
-            ix0 = int(x0 + x1 - icon.width) // 2
-            iy0 = int(y0 + y1 - icon.height) // 2
-            image.paste(icon, (ix0, iy0), icon)
-
-        # draw the box
-        else:
-            # pick a color based on the label
-            color = colors[label % len(colors)]
-            draw.rectangle([x0, y0, x1, y1], outline=color, width=3)
-
-            # draw the label
-            font = ImageFont.load_default(image.height // 20)
-            draw.text((x0, y0), f"{class_name}: {score:.2f}", fill=color, font=font)
+        main_label = label_names[0]
+        draw.rectangle(box, outline=color_map[main_label], width=3)
+        if draw_text:
+            offset_y = .75 * font.size
+            offset_x = .75 * font.size
+            for label_text, score in zip(label_names, scores):
+                draw.text(
+                    (box[0] + offset_x, box[1] + offset_y),
+                    f'({score:.2f}) {label_text}',
+                    fill=color_map[label_text],
+                    font=font
+                )
+                offset_y += font.size
 
 
 if __name__ == "__main__":
@@ -45,16 +56,14 @@ if __name__ == "__main__":
     parser.add_argument('image', help='The image file to draw the boxes on.')
     parser.add_argument('detections', help='The JSON file containing the detections.')
     parser.add_argument('-o', '--output-file', default='output.jpg', help='The file to save the image with the boxes drawn on it.')
-    parser.add_argument('-t', '--threshold', type=float, default=0, help='The threshold for the detections.')
-    parser.add_argument('-i', '--icons', default='icons/', help='The folder containing the icons for the classes.')
     args = parser.parse_args()
 
-    image = Image.open(args.image)
+    image = Image.open(args.image).convert('RGB')
 
     with open(args.detections, 'r') as f:
-        detections = json.load(f)
+        output = json.load(f)
 
-    draw(image, detections, threshold=args.threshold, icons=args.icons)
+    draw(image, output)
 
     image.save(args.output_file)
     print(f'Saved: {args.output_file}')
